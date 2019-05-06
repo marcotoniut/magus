@@ -1,0 +1,43 @@
+name:                magus
+version:             0.1.1
+synopsis:            General purpose Discord bot architectured with an FRP system.
+-- description:         
+license:             BSD3
+license-file:        LICENSE
+author:              Marco Toniut
+maintainer:          marco.toniut@gmail.com
+copyright:           2019 Marco Toniut
+-- category:            
+build-type:          Simple
+extra-source-files:  ChangeLog.md
+cabal-version:       >=2.0
+
+executable magus
+  main-is:             Main.hs
+  other-modules:       Arcana.Game
+                       Arcana.RPS.Discord
+                       Arcana.RPS.Discord.Command
+                       Arcana.RPS
+                       Discord.Reflex.Command
+                       Discord.Reflex
+                       Magus.RPS
+  -- other-extensions:    
+  build-depends:       base
+                     , aeson
+                     , cond
+                     , containers
+                     , data-default
+                     , dependent-sum
+                     , discord-haskell
+                     , either
+                     , lens
+                     , mtl
+                     , primitive
+                     , ref-tf
+                     , reflex
+                     , reflex-basic-host
+                     , stm
+                     , text
+                     , witherable
+  hs-source-dirs:      src
+  default-language:    Haskell2010

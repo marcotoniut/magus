@@ -1,0 +1,18 @@
+resolver: lts-12.18
+
+packages:
+- '.'
+- location:
+    git: git@github.com:commercialhaskell/stack.git
+    commit: 6a86ee32e5b869a877151f74064572225e1a0398
+- location:
+    hg: https://github.com/qfpl/reflex-basic-host/
+    commit: b8265f9f3c1197eb64a715558c48ec4fa4947992
+
+extra-deps:
+- git: https://github.com/aquarial/discord-haskell
+  commit: 8cb10d641f4073e47fd13df3af3d93f51217f119
+- monoidal-containers-0.4.0.0@sha256:7e52944ef27fce8e59b5bac5d59b35e88b36a5f65176aa7b784f848e9e9b9a22
+- ref-tf-0.4.0.1
+- reflex-0.6.1@sha256:21fb0ce6d71243a7bfe8fd6efb1f205662e9d9ec8fab6bd9d96eaff655f36f98
+- reflex-basic-host-0.1
