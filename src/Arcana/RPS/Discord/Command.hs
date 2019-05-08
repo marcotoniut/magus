@@ -2,8 +2,8 @@
     OverloadedStrings, TupleSections, ViewPatterns #-}
 module Arcana.RPS.Discord.Command where
 
-import Control.Arrow (left)
 import Control.Applicative (liftA2, pure, (<*>))
+import Control.Arrow (left)
 import Data.Bool (otherwise)
 import Data.Char (isNumber, toUpper)
 import Data.Either (Either(Left, Right))

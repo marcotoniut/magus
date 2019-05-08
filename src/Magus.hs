@@ -28,6 +28,7 @@ import Discord (
   , Snowflake(Snowflake), ThreadIdType, UserRequest(CreateDM, GetUser)
   , channelId, messageChannel, restCall, userId, userName
   )
+import Prelude (minBound, pred, succ)
 import Reflex
 import Text.Show (show)
 
@@ -75,7 +76,7 @@ magusApp dis rg = do
   e_m <- subscribeToDiscord dis
   let (f_dc, e_dc) = fanEither $ catchCommand (Proxy @"!dice") e_m
   
-  e_dr <- attachRandom rg (e_dc <&> \c -> (randomR (0, _diceCommandSize c), c))
+  e_dr <- fmap (first succ) <$> attachRandom rg (e_dc <&> \c -> (randomR (minBound, pred $ _diceCommandSize c), c))
 
   rpsApp dis
 
@@ -84,5 +85,10 @@ magusApp dis rg = do
         CreateMessageEmbed (messageChannel m) "" def
           { D.embedTitle = pure $ "Throws D" <> show s
           , D.embedDescription = pure $ show r
+          }
+    , f_dc <&> \(e, m) ->
+        CreateMessageEmbed (messageChannel m) "" def
+          { D.embedTitle = pure $ "Failed Dice Throw"
+          , D.embedDescription = pure e
           }
     ]
