@@ -69,11 +69,10 @@ data RPSPlayCommand = RPSPlayCommand
   } deriving (Eq, Show)
 
 instance DiscordCommand "rps-play" (Either CommandError RPSPlayCommand) where
-  parseCommand _ m
-    = left (, m) $ do
-      let aut = messageAuthor m
-      cho <- takeChoice . drop 1 . words . unpack $ messageText m
-      pure $ RPSPlayCommand (messageChannel m) aut cho
+  parseCommand _ m = left (, m) $ do
+    let aut = messageAuthor m
+    cho <- takeChoice . drop 1 . words . unpack $ messageText m
+    pure $ RPSPlayCommand (messageChannel m) aut cho
     where
       takeChoice :: [String] -> Either String RPS
       takeChoice = \case
