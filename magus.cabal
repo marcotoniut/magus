@@ -14,14 +14,14 @@ cabal-version:       >=2.0
 
 executable magus
   main-is:             Main.hs
-  other-modules:       Arcana.Discord.Command
-                       Arcana.Game
+  other-modules:       Arcana.Game
                        Arcana.RPS.Discord
                        Arcana.RPS.Discord.Command
                        Arcana.RPS
                        Discord.Reflex.Command
                        Discord.Reflex
                        Magus
+                       Magus.Command
                        Magus.RPS
   -- other-extensions:    
   build-depends:       base

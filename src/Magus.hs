@@ -31,10 +31,10 @@ import Discord (
 import Reflex
 import Text.Show (show)
 
-import Arcana.Discord.Command
 import Arcana.Game
 import Discord.Reflex
 import Discord.Reflex.Command
+import Magus.Command
 import Magus.RPS (rpsApp)
 
 import qualified Discord as D

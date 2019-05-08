@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, FlexibleInstances, LambdaCase, MultiParamTypeClasses, NoImplicitPrelude,
     OverloadedStrings, TupleSections, ViewPatterns #-}
-module Arcana.Discord.Command where
+module Magus.Command where
 
 import Control.Applicative (pure)
 import Data.Function (($))
