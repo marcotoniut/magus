@@ -32,10 +32,10 @@ import Text.Show (show)
 
 import Arcana.Game
 import Arcana.RPS
-import Arcana.RPS.Discord
-import Arcana.RPS.Discord.Command
 import Discord.Reflex
 import Discord.Reflex.Command
+import Magus.RPS.Base
+import Magus.RPS.Command
 
 import qualified Discord as D
 import qualified Prelude as P

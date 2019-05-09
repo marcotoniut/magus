@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, FlexibleInstances, LambdaCase, MultiParamTypeClasses, NoImplicitPrelude,
     OverloadedStrings, TupleSections, ViewPatterns #-}
-module Arcana.RPS.Discord.Command where
+module Magus.RPS.Command where
 
 import Control.Applicative (liftA2, pure, (<*>))
 import Control.Arrow (left)
@@ -50,7 +50,7 @@ instance DiscordCommand "rps" (Either CommandError RPSCommand) where
       takePlayer :: [String] -> Either String Snowflake
       takePlayer []  = Left "You are missing an opponent."
       takePlayer [x] = maybeToRight "Invalid Username." (toSnowflake x)
-      takePlayer _   = Left "Too many options.." -- TODO
+      takePlayer _   = Left "Only one optional argument accepted (opponent user)" -- TODO
       toSnowflake :: String -> Maybe Snowflake
       toSnowflake = fmap Snowflake . readMaybe . filter isNumber
 

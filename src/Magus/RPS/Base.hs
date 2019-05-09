@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase, NoImplicitPrelude, TemplateHaskell #-}
-module Arcana.RPS.Discord where
+module Magus.RPS.Base where
 
 import Control.Lens (makeLenses)
 import Data.Eq (Eq)
@@ -13,6 +13,7 @@ import Text.Show (Show)
 import Arcana.Game
 import Arcana.RPS
 
+-- |
 data RPSPlayer = RPSPlayer
   { _rpsPlayerUser :: User
   , _rpsPlayerChannel :: Channel
