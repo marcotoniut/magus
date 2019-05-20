@@ -1,9 +1,8 @@
 {-# LANGUAGE ApplicativeDo, DataKinds, FlexibleContexts, GADTs, LambdaCase,
     NoImplicitPrelude, OverloadedStrings, RankNTypes, RecursiveDo, ScopedTypeVariables,
     TupleSections, TypeApplications #-}
-module Magus where
+module Magus.Truco where
 
-import Control.Arrow (first)
 import Control.Applicative (liftA2, pure, (<*>))
 import Control.Lens (set')
 import Control.Monad (join, sequence, unless, void, mapM_, (>>=))
@@ -28,39 +27,31 @@ import Discord (
   , Snowflake(Snowflake), ThreadIdType, UserRequest(CreateDM, GetUser)
   , channelId, messageChannel, restCall, userId, userName
   )
-import Prelude (minBound, pred, succ)
 import Reflex
 import Text.Show (show)
 
 import Arcana.Game
+import Arcana.Truco.Types
 import Discord.Reflex
 import Discord.Reflex.Command
-import Magus.Command
-import Magus.RPS (rpsApp)
-import Magus.Truco (trucoApp)
+import Magus.Truco.Base
+import Magus.Truco.Command
 
 import qualified Discord as D
 import qualified Prelude as P
 
-import System.Random
+data Jugada = Jugada Player Card
 
-attachRandom ::
-  ( MonadHold t m
-  , MonadFix m
-  , Random a
-  , RandomGen g
-  , Reflex t
-  ) => g
-    -> Event t (g -> (a, g), b)
-    -> m (Event t (a, b))
-attachRandom rg e = do
-  rec
-    b_g <- hold rg (snd . fst <$> e_r)
-    let e_r = attachWith (\g (f, x) -> (f g, x)) b_g e
-  pure (first fst <$> e_r)
+jugar :: Ronda -> Jugada -> Ronda
+jugar (Ronda js) j = Ronda (j:js)
+
+-- data Ronda a (n :: Nat) = Ronda (VecList n a)
+data Ronda = Ronda [Jugada]
+
+data Juego = Juego [Ronda]
 
 
-magusApp :: forall t m g.
+trucoApp :: forall t m.
   ( Reflex t
   , MonadHold t m
   , MonadFix m
@@ -68,28 +59,36 @@ magusApp :: forall t m g.
   , MonadIO (Performable m)
   , PostBuild t m
   , PerformEvent t m
-  , RandomGen g
   , TriggerEvent t m
   ) => (RestChan, Gateway, [ThreadIdType])
-    -> g
     -> m ()
-magusApp dis rg = do
+trucoApp dis = do
   e_m <- subscribeToDiscord dis
-  let (f_dc, e_dc) = fanEither $ catchCommand (Proxy @"!dice") e_m
+  let (f_rps, e_ngc) = fanEither $ catchCommand (Proxy @"!truco") e_m
+      -- (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"rps-play") e_m
+
+  e_igc <- registerNewGame e_ngc
+  (f_ng, e_ng) <- fmap fanEither $ performEvent $ e_igc <&> \(i, c) -> liftIO $ do
+    let id1 = _trucoCommandPlayer1 c
+        id2 = _trucoCommandPlayer2 c
+    ec1 <- restCall dis (CreateDM id1)
+    ec2 <- restCall dis (CreateDM id2)
+    eu1 <- restCall dis (GetUser id1)
+    eu2 <- restCall dis (GetUser id2)
+    pure $ (\u1 c1 u2 c2 -> TrucoGame
+      { _trucoGameId        = i
+      , _trucoGameChannelId = _trucoCommandChannel c
+      , _trucoGamePlayer1   = TrucoPlayer u1 c1
+      , _trucoGamePlayer2   = TrucoPlayer u2 c2
+      , _trucoGameJuego     = consTurnPlay
+      }) <$> eu1 <*> ec1 <*> eu2 <*> ec2
+
+
   
-  e_dr <- fmap (first succ) <$> attachRandom rg (e_dc <&> \c -> (randomR (minBound, pred $ _diceCommandSize c), c))
-
-  rpsApp dis
-
-  mapM_ (emitToDiscord dis)
-    [ e_dr <&> \(r, DiceCommand m s) ->
-        CreateMessageEmbed (messageChannel m) "" def
-          { D.embedTitle = pure $ "Throws D" <> show s
-          , D.embedDescription = pure $ show r
-          }
-    , f_dc <&> \(e, m) ->
-        CreateMessageEmbed (messageChannel m) "" def
-          { D.embedTitle = pure $ "Failed Dice Throw"
-          , D.embedDescription = pure e
-          }
-    ]
+  P.undefined
+  where
+    registerNewGame :: P.Num n => Event t a -> m (Event t (n, a))
+    registerNewGame e = do
+      d_id <- count e
+      pure $ attach (current d_id) e
+  

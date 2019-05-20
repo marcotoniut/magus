@@ -10,7 +10,7 @@ import Data.Maybe (Maybe(Just, Nothing))
 import Data.Proxy (Proxy(Proxy))
 import Data.Semigroup ((<>))
 import Data.String (String)
-import Data.Text (pack, isPrefixOf)
+import Data.Text (Text, pack, isPrefixOf)
 import Data.Witherable (Filterable, mapMaybe, filter)
 import Discord (Event(MessageCreate), Message, messageText, messageChannel)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
@@ -32,3 +32,5 @@ class (KnownSymbol n) => DiscordCommand (n :: Symbol) r | n -> r where
     . filter (hasPrefix (symbolVal p)) -- TODO fmapMaybe consume prefix
     . filterMessageCreate
   parseCommand :: Proxy n -> Message -> r
+  commandName :: Proxy n -> Text
+  commandName = pack . symbolVal

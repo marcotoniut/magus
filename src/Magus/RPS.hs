@@ -53,8 +53,8 @@ rpsApp :: forall t m.
     -> m ()
 rpsApp dis = do
   e_m <- subscribeToDiscord dis
-  let (f_rps, e_ngc) = fanEither $ catchCommand (Proxy @"rps") e_m
-      (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"rps-play") e_m
+  let (f_rps, e_ngc) = fanEither $ catchCommand (Proxy @"!rps") e_m
+      (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"!rpsplay") e_m
 
   e_igc <- registerNewGame e_ngc
   (f_ng, e_ng) <- fmap fanEither $ performEvent $ e_igc <&> \(i, c) -> liftIO $ do
@@ -165,7 +165,7 @@ rpsEmbed = def
 renderRPSPlayerExplanation :: Text
 renderRPSPlayerExplanation 
   =  "MATCH STARTED!\n"
-  <> "Respond with `rps-play` followed by an option:\n"
+  <> "Respond with " <> commandName (Proxy @"!rpsplay") <> " followed by an option:\n"
   <> "`r` (Rock)\n"
   <> "`p` (Paper)\n"
   <> "`s` (Scissors)\n"

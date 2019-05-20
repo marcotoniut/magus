@@ -16,6 +16,7 @@ executable magus
   main-is:             Main.hs
   other-modules:       Arcana.Game
                        Arcana.RPS
+                       Arcana.Truco.Types
                        Discord.Reflex.Command
                        Discord.Reflex
                        Magus
@@ -23,6 +24,9 @@ executable magus
                        Magus.RPS
                        Magus.RPS.Base
                        Magus.RPS.Command
+                       Magus.Truco
+                       Magus.Truco.Base
+                       Magus.Truco.Command
   -- other-extensions:    
   build-depends:       base
                      , aeson
@@ -32,7 +36,9 @@ executable magus
                      , dependent-sum
                      , discord-haskell
                      , either
+                     , fixed-vector
                      , lens
+                     , linear
                      , mtl
                      , primitive
                      , random

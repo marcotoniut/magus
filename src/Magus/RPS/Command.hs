@@ -41,10 +41,10 @@ data RPSCommand = RPSCommand
   , rpsCommandPlayer2 :: Snowflake
   } deriving Show
 
-instance DiscordCommand "rps" (Either CommandError RPSCommand) where
-  parseCommand _ m = do
+instance DiscordCommand "!rps" (Either CommandError RPSCommand) where
+  parseCommand _ m = left (, m) $ do
     let p1 = userId $ messageAuthor m
-    p2 <- left ((, m)) $ takePlayer (drop 1 . words . unpack $ messageText m)
+    p2 <- takePlayer (drop 1 . words . unpack $ messageText m)
     pure $ RPSCommand (messageChannel m) p1 p2
     where
       takePlayer :: [String] -> Either String Snowflake
@@ -68,7 +68,7 @@ data RPSPlayCommand = RPSPlayCommand
   , rpsPlayCommandChoice  :: RPS
   } deriving (Eq, Show)
 
-instance DiscordCommand "rps-play" (Either CommandError RPSPlayCommand) where
+instance DiscordCommand "!rpsplay" (Either CommandError RPSPlayCommand) where
   parseCommand _ m = left (, m) $ do
     let aut = messageAuthor m
     cho <- takeChoice . drop 1 . words . unpack $ messageText m
