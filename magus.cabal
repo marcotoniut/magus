@@ -16,6 +16,7 @@ executable magus
   main-is:             Main.hs
   other-modules:       Arcana.Game
                        Arcana.RPS
+                       Arcana.Truco.Mazo
                        Arcana.Truco.Types
                        Discord.Reflex.Command
                        Discord.Reflex
@@ -37,11 +38,13 @@ executable magus
                      , discord-haskell
                      , either
                      , fixed-vector
+                     , ilist
                      , lens
                      , linear
                      , mtl
                      , primitive
                      , random
+                     , random-shuffle
                      , ref-tf
                      , reflex
                      , reflex-basic-host

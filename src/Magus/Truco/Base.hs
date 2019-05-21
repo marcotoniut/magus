@@ -1,13 +1,21 @@
-{-# LANGUAGE LambdaCase, NoImplicitPrelude, TemplateHaskell #-}
+{-# LANGUAGE LambdaCase, NoImplicitPrelude, TemplateHaskell, ViewPatterns #-}
 module Magus.Truco.Base where
 
+import Control.Applicative (pure)
 import Control.Lens (makeLenses)
-import Data.Eq (Eq)
+import Data.Either (Either(Left, Right))
+import Data.Either.Combinators
+import Data.Eq (Eq, (==))
+import Data.Functor ((<$>))
+import Data.List.Index
+import Data.Word
+import Data.Tuple (snd)
 import Discord (
     Channel, ChannelRequest(CreateMessage), Gateway, RestChan, Snowflake(Snowflake)
   , ThreadIdType, User, restCall
   )
 import Numeric.Natural (Natural)
+import Prelude (fromEnum)
 import Text.Show (Show)
 
 import Arcana.Game
@@ -26,21 +34,33 @@ makeLenses ''TrucoPlayer
 data TrucoGame = TrucoGame
   { _trucoGameId        :: Natural
   , _trucoGameChannelId :: Snowflake
+  , _trucoGameMazo      :: [Card]
   , _trucoGamePlayer1   :: TrucoPlayer
+  , _trucoGameHand1     :: [Card]
   , _trucoGamePlayer2   :: TrucoPlayer
+  , _trucoGameHand2     :: [Card]
   , _trucoGameJuego     :: TurnPlay Card Card
   } deriving (Eq, Show)
 
 makeLenses ''TrucoGame
 
--- data TrucoGameError u
---   = RPSIncorrectPlayer u
---   | RPSPayedInPublicRoom u Snowflake
---   | RPSSimultaneousPlayError u SimultaneousPlayError
---   deriving (Eq, Show)
+data TrucoGameError u
+  = TrucoIncorrectPlayer u
+  | TrucoPayedInPublicRoom u Snowflake
+  | TrucoPlayError u PlayError
+  | TrucoTurnPlayError u TurnPlayError
+  deriving (Eq, Show)
 
--- trucoGameErrorUser :: (TrucoGameGameError u) -> u
--- trucoGameErrorUser = \case
---   RPSIncorrectPlayer u -> u
---   RPSPayedInPublicRoom u _ -> u
---   RPSSimultaneousPlayError u _ -> u
+trucoGameErrorUser :: (TrucoGameError u) -> u
+trucoGameErrorUser = \case
+  TrucoIncorrectPlayer u -> u
+  TrucoPayedInPublicRoom u _ -> u
+  TrucoPlayError u _ -> u
+  TrucoTurnPlayError u _ -> u
+
+data PlayError = OutOfBound deriving (Eq, Show)
+
+playCard :: Word -> [Card] -> Either PlayError (Card, [Card])
+playCard (fromEnum -> i) cs = do
+  c <- snd <$> maybeToRight OutOfBound (ifind (\k _ -> k == i) cs)
+  pure (c, deleteAt i cs)
