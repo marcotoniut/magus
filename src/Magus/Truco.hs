@@ -1,6 +1,6 @@
 {-# LANGUAGE ApplicativeDo, DataKinds, FlexibleContexts, GADTs, LambdaCase,
     NoImplicitPrelude, OverloadedStrings, RankNTypes, RecursiveDo, ScopedTypeVariables,
-    TupleSections, TypeApplications #-}
+    TupleSections, TypeApplications, ViewPatterns #-}
 module Magus.Truco where
 
 import Control.Applicative (liftA2, pure, (<*>))
@@ -18,7 +18,9 @@ import Data.Either (Either(Left, Right))
 import Data.Either.Combinators (rightToMaybe)
 import Data.Function (id, ($), (&), (.))
 import Data.Functor (fmap, (<$>), (<&>))
-import Data.Maybe (Maybe(Just, Nothing), fromMaybe, isJust)
+import Data.List.Index (indexed)
+import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
+import Data.Monoid (mconcat)
 import Data.Proxy (Proxy(Proxy))
 import Data.Semigroup ((<>))
 import Data.Text (Text, pack, unpack)
@@ -28,6 +30,7 @@ import Discord (
   , Snowflake(Snowflake), ThreadIdType, UserRequest(CreateDM, GetUser)
   , channelId, messageChannel, restCall, userId, userName
   )
+import Prelude (succ)
 import Reflex
 import System.Random
 import Text.Show (show)
@@ -39,6 +42,7 @@ import Discord.Reflex
 import Discord.Reflex.Command
 import Magus.Truco.Base
 import Magus.Truco.Command
+import Magus.Truco.Render
 
 import qualified Discord as D
 import qualified Prelude as P
@@ -67,7 +71,7 @@ trucoApp :: forall t m.
     -> m ()
 trucoApp dis = do
   e_m <- subscribeToDiscord dis
-  let (f_rps, e_ngc) = fanEither $ catchCommand (Proxy @"!truco") e_m
+  let (f_ngc, e_ngc) = fanEither $ catchCommand (Proxy @"!truco") e_m
       (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"!tplay") e_m
 
   e_igc <- registerNewGame e_ngc
@@ -94,7 +98,6 @@ trucoApp dis = do
       , _trucoGameJuego     = consTurnPlay
       }) <$> eu1 <*> ec1 <*> eu2 <*> ec2
 
-
   rec
     let
       (f_pla, e_pla) :: (Event t (TrucoGameError Snowflake), Event t (TrucoGame, Maybe TrucoPlayCommand))
@@ -113,7 +116,52 @@ trucoApp dis = do
       , e_pla
       ]
   let e_state = mapMaybe id (updated d_state)
-  P.undefined
+  mapM_ (emitToDiscord dis)
+    [ e_ng <&> \g ->
+        CreateMessageEmbed (_trucoGameChannelId g) "" trucoEmbed
+          { D.embedDescription = pure . unpack
+            $ renderTrucoGameStarted g
+          }
+    , e_ng <&> \g ->
+        CreateMessageEmbed (channelId . _trucoPlayerChannel $ _trucoGamePlayer1 g) "" trucoEmbed
+          { D.embedDescription = pure . unpack
+            $ renderTrucoPlayerHand (_trucoGameHand1 g)
+          }
+    , e_ng <&> \g ->
+        CreateMessageEmbed (channelId . _trucoPlayerChannel $ _trucoGamePlayer2 g) "" trucoEmbed
+          { D.embedDescription = pure . unpack
+            $ renderTrucoPlayerHand (_trucoGameHand2 g)
+          }
+    -- , ffilter (isJust . matchPlay . _rpsGamePlay) (fst <$> e_state) <&> \g ->
+    --     CreateMessageEmbed (_rpsGameChannelId g) "" rpsEmbed
+    --       { D.embedDescription = pure . unpack $ renderRPSGameFinished g
+    --       }
+    -- , mapMaybe sequence e_state <&> \(g, p) -> do
+    --     let u1 = _rpsGamePlayer1 g
+    --         u2 = _rpsGamePlayer2 g
+    --     if userId (rpsPlayCommandAuthor p) == userId (_rpsPlayerUser u1)
+    --     then CreateMessageEmbed (_rpsGameChannelId g) "" $ rpsEmbed
+    --       { D.embedDescription = pure $ userName (_rpsPlayerUser u1) <> " made a move."
+    --       }
+    --     else CreateMessageEmbed (_rpsGameChannelId g) "" $ rpsEmbed
+    --       { D.embedDescription = pure
+    --         $ userName (_rpsPlayerUser u2) <> " made a move."
+    --       }
+    -- -- , f_dmc <&> \e -> CreateMessage (Snowflake c) $ pack (show e)
+    -- , f_pla <&> \case
+    --     RPSPayedInPublicRoom _ c -> CreateMessageEmbed c "" rpsEmbed
+    --       { D.embedDescription = pure $ "You shouldn't announce your play on a public room! Tell me on DM instead."
+    --       }
+    --     e -> CreateMessageEmbed (rpsGameErrorUser e) "" rpsEmbed
+    --       { D.embedDescription = pure $ show e
+    --       }
+    -- , f_rps <&> \(e, m) -> CreateMessageEmbed (messageChannel m) "" rpsEmbed
+    --       { D.embedDescription = pure e
+    --       }
+    -- , f_plc <&> \(e, m) -> CreateMessageEmbed (messageChannel m) "" rpsEmbed
+    --       { D.embedDescription = pure e
+    --       }
+    ]
   where
     registerNewGame :: P.Num n => Event t a -> m (Event t (n, a))
     registerNewGame e = do
@@ -135,3 +183,38 @@ trucoApp dis = do
         uid = userId $ _trucoPlayCommandAuthor p
         pc = _trucoPlayCommandCard p
         gp = _trucoGameJuego g
+
+
+trucoEmbed :: D.Embed
+trucoEmbed = def
+  { D.embedTitle = pure "Truco Game"
+  } 
+
+renderTrucoPlayerHand :: [Card] -> Text
+renderTrucoPlayerHand (indexed -> cs)
+  =  "YOUR HAND!\n"
+  <> "Respond with " <> commandName (Proxy @"!tplay") <> " followed by an option:\n"
+  <> pack (mconcat (ffor cs (\(i, c) -> show (succ i) <> ") " <> showCard c <> "\n")))
+
+renderTrucoGameStarted :: TrucoGame -> Text
+renderTrucoGameStarted g = pack
+  $  "BEGIN!\n"
+  <> (userName . _trucoPlayerUser $ _trucoGamePlayer1 g)
+  <> " vs "
+  <> (userName . _trucoPlayerUser $ _trucoGamePlayer2 g) <> "\n"
+  <> "A DM was sent with your dealt Hand\n"
+
+renderTrucoGameFinished :: TrucoGame -> Text
+renderTrucoGameFinished g = pack
+  $  "(" <> (userName . _trucoPlayerUser $ _trucoGamePlayer1 g) <> ") "
+  <> maybe "[ X ]" show (justFirstPlay $ _trucoGameJuego g)
+  <> " vs "
+  <> maybe "[ X ]" show (justSecondPlay $ _trucoGameJuego g)
+  <> " (" <> (userName . _trucoPlayerUser $ _trucoGamePlayer2 g) <> ")\n"
+  -- <> fromMaybe "MATCH UNRESOLVED" (renderResult <$> matchPlay (_trucoGamePlay g)) <> "\n"
+  -- where
+  --   renderResult = \case
+  --     Win  -> (userName . _trucoPlayerUser $ _trucoGamePlayer1 g) <> " WINS!"
+  --     Lose -> (userName . _trucoPlayerUser $ _trucoGamePlayer2 g) <> " WINS!"
+  --     Tie  -> "GAME WAS A TIE"
+        

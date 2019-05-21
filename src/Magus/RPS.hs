@@ -17,7 +17,7 @@ import Data.Either (Either(Left, Right))
 import Data.Either.Combinators (rightToMaybe)
 import Data.Function (id, ($), (&), (.))
 import Data.Functor (fmap, (<$>), (<&>))
-import Data.Maybe (Maybe(Just, Nothing), fromMaybe, isJust)
+import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Proxy (Proxy(Proxy))
 import Data.Semigroup ((<>))
 import Data.Text (Text, pack, unpack)
@@ -180,11 +180,11 @@ renderRPSGameStarted g = pack
 renderRPSGameFinished :: RPSGame -> Text
 renderRPSGameFinished g = pack
   $  "(" <> (userName . _rpsPlayerUser $ _rpsGamePlayer1 g) <> ") "
-  <> fromMaybe "[ X ]" (fmap show . fst $ _rpsGamePlay g)
+  <> maybe "[ X ]" show (fst $ _rpsGamePlay g)
   <> " vs "
-  <> fromMaybe "[ X ]" (fmap show . snd $ _rpsGamePlay g)
+  <> maybe "[ X ]" show (snd $ _rpsGamePlay g)
   <> " (" <> (userName . _rpsPlayerUser $ _rpsGamePlayer2 g) <> ")\n"
-  <> fromMaybe "MATCH UNRESOLVED" (renderResult <$> matchPlay (_rpsGamePlay g)) <> "\n"
+  <> maybe "MATCH UNRESOLVED" renderResult (matchPlay (_rpsGamePlay g)) <> "\n"
   where
     renderResult = \case
       Win  -> (userName . _rpsPlayerUser $ _rpsGamePlayer1 g) <> " WINS!"
