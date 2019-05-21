@@ -15,7 +15,7 @@ import Discord (
   , ThreadIdType, User, restCall
   )
 import Numeric.Natural (Natural)
-import Prelude (fromEnum)
+import Prelude (fromIntegral)
 import Text.Show (Show)
 
 import Arcana.Game
@@ -61,6 +61,6 @@ trucoGameErrorUser = \case
 data PlayError = OutOfBound deriving (Eq, Show)
 
 playCard :: Word -> [Card] -> Either PlayError (Card, [Card])
-playCard (fromEnum -> i) cs = do
+playCard (fromIntegral -> i) cs = do
   c <- snd <$> maybeToRight OutOfBound (ifind (\k _ -> k == i) cs)
   pure (c, deleteAt i cs)

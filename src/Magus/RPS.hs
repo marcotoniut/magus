@@ -172,16 +172,14 @@ renderRPSPlayerExplanation
 
 renderRPSGameStarted :: RPSGame -> Text
 renderRPSGameStarted g = pack
-  $  "----- Rock Paper Scissors -----\n"
-  <> "BEGIN!\n"
+  $  "BEGIN!\n"
   <> (userName . _rpsPlayerUser $ _rpsGamePlayer1 g)
   <> " vs "
   <> (userName . _rpsPlayerUser $ _rpsGamePlayer2 g) <> "\n"
 
 renderRPSGameFinished :: RPSGame -> Text
 renderRPSGameFinished g = pack
-  $  "----- Rock Paper Scissors -----\n"
-  <> "(" <> (userName . _rpsPlayerUser $ _rpsGamePlayer1 g) <> ") "
+  $  "(" <> (userName . _rpsPlayerUser $ _rpsGamePlayer1 g) <> ") "
   <> fromMaybe "[ X ]" (fmap show . fst $ _rpsGamePlay g)
   <> " vs "
   <> fromMaybe "[ X ]" (fmap show . snd $ _rpsGamePlay g)
