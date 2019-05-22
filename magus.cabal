@@ -29,6 +29,7 @@ executable magus
                        Magus.Truco.Base
                        Magus.Truco.Command
                        Magus.Truco.Render
+                       Magus.Types
   -- other-extensions:    
   build-depends:       base
                      , aeson

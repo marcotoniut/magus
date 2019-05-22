@@ -64,3 +64,9 @@ justFinished :: TurnPlay a b -> Maybe (a, b)
 justFinished = \case
   PlayedBoth  x y -> Just (x, y)
   _               -> Nothing
+
+
+-- data RoundPlay a (s :: Nat) (n :: Nat) where
+--   PlayedNeither | PlayedFirst a | PlayedBoth a b
+--   deriving (Eq, Show)
+

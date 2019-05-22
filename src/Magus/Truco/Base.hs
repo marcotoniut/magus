@@ -21,23 +21,15 @@ import Text.Show (Show)
 import Arcana.Game
 -- import Arcana.Truco
 import Arcana.Truco.Types
-
--- |
-data TrucoPlayer = TrucoPlayer
-  { _trucoPlayerUser :: User
-  , _trucoPlayerChannel :: Channel
-  } deriving (Eq, Show)
-
-makeLenses ''TrucoPlayer
-
+import Magus.Types
 
 data TrucoGame = TrucoGame
   { _trucoGameId        :: Natural
   , _trucoGameChannelId :: Snowflake
   , _trucoGameMazo      :: [Card]
-  , _trucoGamePlayer1   :: TrucoPlayer
+  , _trucoGamePlayer1   :: Player
   , _trucoGameHand1     :: [Card]
-  , _trucoGamePlayer2   :: TrucoPlayer
+  , _trucoGamePlayer2   :: Player
   , _trucoGameHand2     :: [Card]
   , _trucoGameJuego     :: TurnPlay Card Card
   } deriving (Eq, Show)

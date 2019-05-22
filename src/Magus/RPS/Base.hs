@@ -12,21 +12,13 @@ import Text.Show (Show)
 
 import Arcana.Game
 import Arcana.RPS
-
--- |
-data RPSPlayer = RPSPlayer
-  { _rpsPlayerUser :: User
-  , _rpsPlayerChannel :: Channel
-  } deriving (Eq, Show)
-
-makeLenses ''RPSPlayer
-
+import Magus.Types
 
 data RPSGame = RPSGame
   { _rpsGameId        :: Natural
   , _rpsGameChannelId :: Snowflake
-  , _rpsGamePlayer1   :: RPSPlayer
-  , _rpsGamePlayer2   :: RPSPlayer
+  , _rpsGamePlayer1   :: Player
+  , _rpsGamePlayer2   :: Player
   , _rpsGamePlay      :: SimultaneousPlay RPS RPS
   } deriving (Eq, Show)
 

@@ -4,8 +4,6 @@ module Arcana.Truco.Types where
 
 import        Control.Monad.State
 import        Control.Lens
--- import        System.Console.ANSI
---------------------------------
 
 data Valor = Tres | Dos | Ancho | Rey | Caballo | Sota | Siete | Seis | Cinco | Cuatro
   deriving (Bounded, Enum, Eq, Ord, Show)
@@ -40,7 +38,7 @@ type Name = String
 --   , _playerTeam :: TeamId
 --   }
 
-data Player   = Player
+data TrucoPlayer = TrucoPlayer
   { _name     :: Name     --player name
   , _cards    :: [Card]   --cards in hand
   , _down     :: [Card]   --cards on table
@@ -72,18 +70,19 @@ data Hand     = Hand
   { _truco              :: TrucoChallenge         --truco challenge already? 
   , _envido             :: EnvidoChallenge        --envido challenge already?
   , _round              :: Round                  --1st, 2nd, 3rd round?
-  , _roundCards         :: [(PlayerId,Card)]      --Cards in play
+  , _roundCards         :: [(PlayerId, Card)]     --Cards in play
   , _handStarter        :: PlayerId               --player who start the hand
   , _roundStarter       :: PlayerId               --player who starts the round
-  , _formerRounds       :: [(Round,Maybe TeamId)] }     --which team won each round
+  , _formerRounds       :: [(Round, Maybe TeamId)] }     --which team won each round
   
 data Game     = Game
-  { _players  :: [Player]          --Players
+  { _players  :: [TrucoPlayer]          --Players
   , _hand     :: Hand              --current hand
-  , _points   :: (Int, Int) }      --points by team 
+  , _points   :: (Int, Int) 
+  } -- Points by team
 
 makeLenses    ''Game
-makeLenses    ''Player
+makeLenses    ''TrucoPlayer
 makeLenses    ''Hand
 
 data Option = E Envido | T Truco | C Card deriving Show
