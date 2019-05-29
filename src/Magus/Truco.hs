@@ -58,11 +58,10 @@ data Ronda = Ronda [Jugada]
 
 data Juego = Juego [Ronda]
 
-
 trucoApp :: forall t m.
   ( Reflex t
-  , MonadHold t m
   , MonadFix m
+  , MonadHold t m
   , MonadIO m
   , MonadIO (Performable m)
   , PostBuild t m
@@ -76,6 +75,7 @@ trucoApp dis = do
       (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"!tplay") e_m
 
   e_igc <- registerNewGame e_ngc
+
   (f_ng, e_ng) <- fmap fanEither $ performEvent $ e_igc <&> \(i, c) -> liftIO $ do
     let id1 = _trucoCommandPlayer1 c
         id2 = _trucoCommandPlayer2 c

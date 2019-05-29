@@ -3,6 +3,7 @@
     TupleSections, TypeApplications #-}
 module Magus where
 
+import Control.Monad.Reader
 import Control.Arrow (first)
 import Control.Applicative (liftA2, pure, (<*>))
 import Control.Lens (set')
@@ -36,6 +37,7 @@ import Arcana.Game
 import Discord.Reflex
 import Discord.Reflex.Command
 import Magus.Command
+import Magus.Party (runPartyT)
 import Magus.RPS (rpsApp)
 import Magus.Truco (trucoApp)
 
@@ -59,7 +61,6 @@ attachRandom rg e = do
     let e_r = attachWith (\g (f, x) -> (f g, x)) b_g e
   pure (first fst <$> e_r)
 
-
 magusApp :: forall t m g.
   ( Reflex t
   , MonadHold t m
@@ -70,6 +71,7 @@ magusApp :: forall t m g.
   , PerformEvent t m
   , RandomGen g
   , TriggerEvent t m
+
   ) => (RestChan, Gateway, [ThreadIdType])
     -> g
     -> m ()
@@ -79,8 +81,9 @@ magusApp dis rg = do
   
   e_dr <- fmap (first succ) <$> attachRandom rg (e_dc <&> \c -> (randomR (minBound, pred $ _diceCommandSize c), c))
 
-  rpsApp dis
-  trucoApp dis
+  runPartyT $ do
+    rpsApp dis
+    trucoApp dis
 
   mapM_ (emitToDiscord dis)
     [ e_dr <&> \(r, DiceCommand m s) ->

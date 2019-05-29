@@ -34,6 +34,7 @@ import Arcana.Game
 import Arcana.RPS
 import Discord.Reflex
 import Discord.Reflex.Command
+import Magus.Party
 import Magus.RPS.Base
 import Magus.RPS.Command
 import Magus.Types
@@ -43,6 +44,7 @@ import qualified Prelude as P
 
 rpsApp :: forall t m.
   ( Reflex t
+  , DiscordParty t m
   , MonadHold t m
   , MonadFix m
   , MonadIO m
@@ -57,7 +59,14 @@ rpsApp dis = do
   let (f_rps, e_ngc) = fanEither $ catchCommand (Proxy @"!rps") e_m
       (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"!rpsplay") e_m
 
+  
   e_igc <- registerNewGame e_ngc
+
+  e_participantTest <- invite dis (rpsCommandPlayer1 . snd <$> e_igc)
+  performEvent $ e_participantTest <&> \p -> liftIO $ do
+    P.putStrLn $ show p
+    pure ()
+
   (f_ng, e_ng) <- fmap fanEither $ performEvent $ e_igc <&> \(i, c) -> liftIO $ do
     let id1 = rpsCommandPlayer1 c
         id2 = rpsCommandPlayer2 c

@@ -10,6 +10,7 @@ import Text.Show (Show)
 import Arcana.Game
 import Arcana.RPS
 
+-- Participant
 data Player = Player
   { _playerUser    :: User
   , _playerChannel :: Channel

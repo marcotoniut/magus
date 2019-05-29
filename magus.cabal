@@ -22,6 +22,7 @@ executable magus
                        Discord.Reflex
                        Magus
                        Magus.Command
+                       Magus.Party
                        Magus.RPS
                        Magus.RPS.Base
                        Magus.RPS.Command
