@@ -58,14 +58,12 @@ rpsApp dis = do
   e_m <- subscribeToDiscord dis
   let (f_rps, e_ngc) = fanEither $ catchCommand (Proxy @"!rps") e_m
       (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"!rpsplay") e_m
-
   
   e_igc <- registerNewGame e_ngc
 
-  e_participantTest <- invite dis (rpsCommandPlayer1 . snd <$> e_igc)
-  performEvent $ e_participantTest <&> \p -> liftIO $ do
-    P.putStrLn $ show p
-    pure ()
+  -- TEST Party
+  e_participantTest1 <- invite (rpsCommandPlayer1 . snd <$> e_igc)
+  performEvent $ e_participantTest1 <&> \p -> liftIO $ P.putStrLn $ show p
 
   (f_ng, e_ng) <- fmap fanEither $ performEvent $ e_igc <&> \(i, c) -> liftIO $ do
     let id1 = rpsCommandPlayer1 c
@@ -102,6 +100,7 @@ rpsApp dis = do
   let e_state = mapMaybe id (updated d_state)
 
   mapM_ (emitToDiscord dis)
+    -- [
     [ e_ng <&> \g ->
         CreateMessageEmbed (_rpsGameChannelId g) "" rpsEmbed
           { D.embedDescription = pure . unpack
@@ -132,8 +131,9 @@ rpsApp dis = do
           { D.embedDescription = pure
             $ userName (_playerUser u2) <> " made a move."
           }
-    -- , f_dmc <&> \e -> CreateMessage (Snowflake c) $ pack (show e)
-    , f_pla <&> \case
+    -- -- , f_dmc <&> \e -> CreateMessage (Snowflake c) $ pack (show e)
+    ,
+      f_pla <&> \case
         RPSPayedInPublicRoom _ c -> CreateMessageEmbed c "" rpsEmbed
           { D.embedDescription = pure $ "You shouldn't announce your play on a public room! Tell me on DM instead."
           }

@@ -1,6 +1,5 @@
 {-# LANGUAGE ConstraintKinds, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, NoImplicitPrelude,
-    RankNTypes, RecursiveDo, TupleSections, TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+    RankNTypes, RecursiveDo, ScopedTypeVariables, TupleSections, TypeFamilies #-}
 module Magus.Party where
 
 import Control.Applicative
@@ -9,14 +8,20 @@ import Control.Monad.Trans
 import Control.Monad.Fix
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Either
+import Data.Eq
 import Data.Function (const, id, flip, ($), (.))
-import Data.Functor ((<$>), (<&>))
+import Data.Functor ((<$>), (<&>), ($>))
+import Data.Int
 import Data.Maybe
+import Data.Map (Map)
+import Data.IntMap (IntMap, singleton, lookup)
+import Data.Tuple (fst, uncurry)
 import Discord (
     Snowflake, Gateway, ThreadIdType, RestChan
   , RestCallException, UserRequest(CreateDM, GetUser)
   , restCall
   )
+import Prelude ((+))
 import Reflex
 import System.IO (IO)
 
@@ -24,83 +29,102 @@ import qualified Data.Map as M
 import Magus.Types
 import qualified Prelude as P
 
-type DLogin = (RestChan, Gateway, [ThreadIdType])
+newtype PartyT t m a = PartyT
+  { unPartyT
+  :: Behavior t Int
+  -> Event t (IntMap (Snowflake, Either RestCallException Player))
+  -> EventWriterT t (IntMap Snowflake) m a
+  }
 
--- newtype PartyT t m a = PartyT { runPartyT :: DLogin -> (m a, DLogin) }
-newtype PartyT t m a = PartyT { runPartyT :: DLogin -> m a }
+runWithCachePartyT :: forall t m w a.
+  ( Monad m
+  , MonadFix m
+  , MonadHold t m
+  , MonadIO (Performable m)
+  , PerformEvent t m
+  ) => (RestChan, Gateway, [ThreadIdType])
+    -> PartyT t m a
+    -> m a
+runWithCachePartyT dis w = mdo
+  d_id <- count e_req
+  (a, e_req) <- runEventWriterT $ unPartyT w (current d_id) e_res
+  e_res :: Event t (IntMap (Snowflake, Either RestCallException Player)) <- performEvent $ e_req <&> \xs -> do -- \(i, k) -> do
+    forM xs $ \k -> do
+      res <- liftIO $ fetchParticipant dis k
+      pure $ (k, res)
+  pure a
 
-mapPartyT :: (m a -> n b) -> PartyT t m a -> PartyT t n b
-mapPartyT f m = PartyT $ \dis -> f $ runPartyT m dis
+-- mapPartyT :: (m a -> n b) -> PartyT t m a -> PartyT t n b
+mapPartyT :: (EventWriterT t (IntMap Snowflake) m a -> EventWriterT t (IntMap Snowflake) n b) -> PartyT t m a -> PartyT t n b
+mapPartyT f m = PartyT $ \b e -> f $ unPartyT m b e
 {-# INLINE mapPartyT #-}
 
-liftPartyT :: m a -> PartyT t m a
-liftPartyT m = PartyT (const m)
+liftPartyT :: (Reflex t, Monad m) => EventWriterT t (IntMap Snowflake) m a -> PartyT t m a
+liftPartyT m = PartyT $ \b e -> m
 {-# INLINE liftPartyT #-}
 
 instance (Functor m) => Functor (PartyT t m) where
   fmap f = mapPartyT $ fmap $ \ ~a -> f a
   {-# INLINE fmap #-}
 
-instance Applicative m => Applicative (PartyT t m) where
+instance (Monad m, Reflex t, Applicative m) => Applicative (PartyT t m) where
   pure = liftPartyT . pure
   {-# INLINE pure #-}
-  f <*> v = PartyT $ \dis -> runPartyT f dis <*> runPartyT v dis
+  f <*> v = PartyT $ \b e -> liftA2 k (unPartyT f b e) (unPartyT v b e)
+    where k ~a ~b = a b
 
 -- | CHECK
-instance (Alternative m) => Alternative (PartyT t m) where
-    empty = liftPartyT empty
-    {-# INLINE empty #-}
-    m <|> n = PartyT $ \dis -> runPartyT m dis <|> runPartyT n dis
-    {-# INLINE (<|>) #-}
+-- instance (Monad m, Reflex t, Alternative m) => Alternative (PartyT t m) where
+--   empty = lift empty
+--   {-# INLINE empty #-}
+--   m <|> n = PartyT $ \b e -> unPartyT m b e <|> unPartyT n b e
+--   {-# INLINE (<|>) #-}
 
-instance Monad m => Monad (PartyT t m) where
+instance (Monad m, Reflex t) => Monad (PartyT t m) where
   return = lift . return
   {-# INLINE return #-}
-  m >>= k  = PartyT $ \dis -> do
-      ~a <- runPartyT m dis
-      runPartyT (k a) dis
-      -- return b
+  m >>= k  = PartyT $ \b e -> do
+      ~a <- unPartyT m b e
+      unPartyT (k a) b e
   {-# INLINE (>>=) #-}
   fail msg = lift $ fail msg
   {-# INLINE fail #-}
 
-instance MonadPlus m => MonadPlus (PartyT t m) where
-  mzero       = lift mzero
-  {-# INLINE mzero #-}
-  m `mplus` n = PartyT $ \dis -> runPartyT m dis `mplus` runPartyT n dis
-  {-# INLINE mplus #-}
+-- instance (Reflex t, MonadPlus m) => MonadPlus (PartyT t m) where
+--   mzero       = lift mzero
+--   {-# INLINE mzero #-}
+--   m `mplus` n = PartyT $ \b e -> unPartyT m b e `mplus` unPartyT n b e
+--   {-# INLINE mplus #-}
 
-instance MonadTrans (PartyT t) where
-  -- lift = PartyT $ \_ -> m
-  lift = liftPartyT
+instance Reflex t => MonadTrans (PartyT t) where
+  lift = liftPartyT . lift
   {-# INLINE lift #-}
 
-instance MonadIO m => MonadIO (PartyT t m) where
+instance (Reflex t, MonadIO m) => MonadIO (PartyT t m) where
   liftIO = lift . liftIO
   {-# INLINE liftIO #-}
 
-instance MonadSample t m => MonadSample t (PartyT t m) where
+instance (MonadSample t m, Reflex t) => MonadSample t (PartyT t m) where
   sample = lift . sample
 
-instance MonadHold t m => MonadHold t (PartyT t m) where
+instance (MonadHold t m, Reflex t) => MonadHold t (PartyT t m) where
   hold a0 = lift . hold a0
   holdDyn a0 = lift . holdDyn a0
   holdIncremental a0 = lift . holdIncremental a0
   buildDynamic a0 = lift . buildDynamic a0
   headE = lift . headE
 
-instance (MonadFix m) => MonadFix (PartyT t m) where
-    mfix f = PartyT $ \dis -> mfix $ \a -> runPartyT (f a) dis
-    {-# INLINE mfix #-}
+instance (MonadFix m, Reflex t) => MonadFix (PartyT t m) where
+  mfix f = PartyT $ \b e -> mfix $ \a -> unPartyT (f a) b e
+  {-# INLINE mfix #-}
 
-instance PerformEvent t m => PerformEvent t (PartyT t m) where
-  type Performable (PartyT t m) = PartyT t (Performable m)
-  performEvent_ e =
-    PartyT $ \dis -> performEvent_ $ flip runPartyT dis <$> e
-  performEvent  e =
-    PartyT $ \dis -> performEvent  $ flip runPartyT dis <$> e
+instance (PerformEvent t m, Reflex t) => PerformEvent t (PartyT t m) where
+  -- type Performable (PartyT t m) = PartyT t (Performable m)
+  type Performable (PartyT t m) = Performable m
+  performEvent_ = lift . performEvent_
+  performEvent  = lift . performEvent
 
-instance TriggerEvent t m => TriggerEvent t (PartyT t m) where
+instance (Reflex t, TriggerEvent t m) => TriggerEvent t (PartyT t m) where
   newTriggerEvent = lift newTriggerEvent
   newTriggerEventWithOnComplete = lift newTriggerEventWithOnComplete
   newEventWithLazyTriggerWithOnComplete = lift . newEventWithLazyTriggerWithOnComplete
@@ -108,24 +132,10 @@ instance TriggerEvent t m => TriggerEvent t (PartyT t m) where
 instance PostBuild t m => PostBuild t (PartyT t m) where
   getPostBuild = lift getPostBuild
 
-
--- | Party
 class DiscordParty t m where
   invite ::
-      --  (RestChan, Gateway, [ThreadIdType])
-    -- -> Event t Snowflake
        Event t Snowflake
-    -> m (Event t (Snowflake, Player))
-    -- -> m (Event t (Either RestCallException (Snowflake, Player)))
-  -- discordLogin :: (RestChan, Gateway, [ThreadIdType])
-
-  -- inviteM :: 
-  --     (RestChan, Gateway, [ThreadIdType])
-  --   -> Event t [Snowflake]
-  --   -> m (Event t [(Snowflake, Player)])
--- D TODO
--- Traversable t
-
+    -> m (Event t (Map Snowflake (Either RestCallException Player)))
 
 type FetchConstraints t m =
   ( MonadHold t m
@@ -135,8 +145,14 @@ type FetchConstraints t m =
   )
 
 instance (FetchConstraints t m, MonadFix m) => DiscordParty t (PartyT t m) where
-  invite e = do
-    PartyT $ flip requestParticipantCache e
+  invite e_k = do
+    PartyT $ \b_id e_res -> do
+      let e_i = attach b_id e_k
+      tellEvent (uncurry singleton <$> e_i)
+      b_k <- hold (-1) (fst <$> e_i)
+      let e_r = attachWith (,) b_k e_res
+      -- pure $ Reflex.mapMaybe (\(i, (k, s, p)) -> if i == k then Just (s, p) else Nothing) e_r
+      pure $ Reflex.mapMaybe (\(i, xs) -> uncurry M.singleton <$> lookup i xs) e_r
 
 fetchParticipant ::
        (RestChan, Gateway, [ThreadIdType])
@@ -146,34 +162,3 @@ fetchParticipant dis i = do
   eu <- restCall dis (GetUser i)
   ec <- restCall dis (CreateDM i)
   pure $ Player <$> eu <*> ec
-
-fetchParticipantEvent ::
-  ( FetchConstraints t m
-  ) => (RestChan, Gateway, [ThreadIdType])
-    -> Event t Snowflake
-    -> m (Event t (Either RestCallException Player))
-fetchParticipantEvent dis e = performEvent $ liftIO . fetchParticipant dis <$> e
-
-requestParticipantCache :: forall t m.
-  ( FetchConstraints t m
-  , MonadFix m
-  ) => (RestChan, Gateway, [ThreadIdType])
-    -- -> Dynamic t (M.Map Snowflake Player)
-    -> Event t Snowflake
-    -> m (Event t (Snowflake, Player))
--- requestParticipantCache dis d_m e = do
-requestParticipantCache dis e = mdo
-  let e_mp = attachWith (\m i -> (i, M.lookup i m)) (current d_m) e
-  
-  (f_p, e_kp) <- fmap fanEither . performEvent $ e_mp <&> \(i, mp) -> case mp of
-    Nothing -> do
-      ep <- liftIO $ fetchParticipant dis i
-      pure $ (i,) <$> ep
-    -- TODO Rid of unnecessary inserts
-    Just p  -> do
-      pure $ pure (i, p)
-
-  d_m <- accumDyn (\m (i, p) -> M.insert i p m) M.empty e_kp
-
-  pure e_kp
-

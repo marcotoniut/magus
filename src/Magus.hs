@@ -37,7 +37,7 @@ import Arcana.Game
 import Discord.Reflex
 import Discord.Reflex.Command
 import Magus.Command
-import Magus.Party (runPartyT)
+import Magus.Party (runWithCachePartyT)
 import Magus.RPS (rpsApp)
 import Magus.Truco (trucoApp)
 
@@ -45,6 +45,8 @@ import qualified Discord as D
 import qualified Prelude as P
 
 import System.Random
+
+import qualified Data.Map as M
 
 attachRandom ::
   ( MonadHold t m
@@ -81,10 +83,9 @@ magusApp dis rg = do
   
   e_dr <- fmap (first succ) <$> attachRandom rg (e_dc <&> \c -> (randomR (minBound, pred $ _diceCommandSize c), c))
 
-  runPartyT (do
+  runWithCachePartyT dis $ do
     rpsApp dis
     trucoApp dis
-    ) dis
 
   mapM_ (emitToDiscord dis)
     [ e_dr <&> \(r, DiceCommand m s) ->
