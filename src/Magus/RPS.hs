@@ -62,7 +62,7 @@ rpsApp dis = do
   e_igc <- registerNewGame e_ngc
 
   -- TEST Party
-  e_participantTest1 <- invite (rpsCommandPlayer1 . snd <$> e_igc)
+  e_participantTest1 <- invite (P.replicate 1 . rpsCommandPlayer1 . snd <$> e_igc)
   performEvent $ e_participantTest1 <&> \p -> liftIO $ P.putStrLn $ show p
 
   (f_ng, e_ng) <- fmap fanEither $ performEvent $ e_igc <&> \(i, c) -> liftIO $ do
