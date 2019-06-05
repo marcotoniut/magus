@@ -75,8 +75,8 @@ rpsApp dis = do
     pure $ (\u1 c1 u2 c2 -> RPSGame
       { _rpsGameId        = i
       , _rpsGameChannelId = rpsCommandChannel c
-      , _rpsGamePlayer1   = Player u1 c1
-      , _rpsGamePlayer2   = Player u2 c2
+      , _rpsGamePlayer1   = Participant u1 c1
+      , _rpsGamePlayer2   = Participant u2 c2
       , _rpsGamePlay      = consSimultaneousPlay
       }) <$> eu1 <*> ec1 <*> eu2 <*> ec2
 
@@ -86,8 +86,8 @@ rpsApp dis = do
         = fanEither
         $ (fmap ((\(g, p) -> do
             g2 <- rpsPlay p g
-            if   channelId (_playerChannel (_rpsGamePlayer1 g)) /= rpsPlayCommandChannel p
-              && channelId (_playerChannel (_rpsGamePlayer2 g)) /= rpsPlayCommandChannel p
+            if   channelId (_participantChannel (_rpsGamePlayer1 g)) /= rpsPlayCommandChannel p
+              && channelId (_participantChannel (_rpsGamePlayer2 g)) /= rpsPlayCommandChannel p
             then Left $ RPSPayedInPublicRoom (userId (rpsPlayCommandAuthor p)) (rpsPlayCommandChannel p)
             else Right (g2, Just p)
             )))
@@ -107,12 +107,12 @@ rpsApp dis = do
             $ renderRPSGameStarted g
           }
     , e_ng <&> \g ->
-        CreateMessageEmbed (channelId . _playerChannel $ _rpsGamePlayer1 g) "" rpsEmbed
+        CreateMessageEmbed (channelId . _participantChannel $ _rpsGamePlayer1 g) "" rpsEmbed
           { D.embedDescription = pure . unpack
             $ renderRPSPlayerExplanation
           }
     , e_ng <&> \g ->
-        CreateMessageEmbed (channelId . _playerChannel $ _rpsGamePlayer2 g) "" rpsEmbed
+        CreateMessageEmbed (channelId . _participantChannel $ _rpsGamePlayer2 g) "" rpsEmbed
           { D.embedDescription = pure . unpack
             $ renderRPSPlayerExplanation
           }
@@ -123,13 +123,13 @@ rpsApp dis = do
     , mapMaybe sequence e_state <&> \(g, p) -> do
         let u1 = _rpsGamePlayer1 g
             u2 = _rpsGamePlayer2 g
-        if userId (rpsPlayCommandAuthor p) == userId (_playerUser u1)
+        if userId (rpsPlayCommandAuthor p) == userId (_participantUser u1)
         then CreateMessageEmbed (_rpsGameChannelId g) "" $ rpsEmbed
-          { D.embedDescription = pure $ userName (_playerUser u1) <> " made a move."
+          { D.embedDescription = pure $ userName (_participantUser u1) <> " made a move."
           }
         else CreateMessageEmbed (_rpsGameChannelId g) "" $ rpsEmbed
           { D.embedDescription = pure
-            $ userName (_playerUser u2) <> " made a move."
+            $ userName (_participantUser u2) <> " made a move."
           }
     -- -- , f_dmc <&> \e -> CreateMessage (Snowflake c) $ pack (show e)
     ,
@@ -158,8 +158,8 @@ rpsApp dis = do
       pure $ attach (current d_id) e
     rpsPlay :: RPSPlayCommand -> RPSGame -> Either (RPSGameError Snowflake) RPSGame
     rpsPlay p g
-      | uid == (userId . _playerUser . _rpsGamePlayer1) g = setPlay $ playA pc gp
-      | uid == (userId . _playerUser . _rpsGamePlayer2) g = setPlay $ playB pc gp
+      | uid == (userId . _participantUser . _rpsGamePlayer1) g = setPlay $ playA pc gp
+      | uid == (userId . _participantUser . _rpsGamePlayer2) g = setPlay $ playB pc gp
       | otherwise = Left $ RPSIncorrectPlayer uid
       where
         setPlay = bimap (RPSSimultaneousPlayError uid) (\p -> set' rpsGamePlay p g)
@@ -182,20 +182,20 @@ renderRPSPlayerExplanation
 
 renderRPSGameStarted :: RPSGame -> Text
 renderRPSGameStarted g = pack
-  $  (userName . _playerUser . _rpsGamePlayer1) g
+  $  (userName . _participantUser . _rpsGamePlayer1) g
   <> " vs "
-  <> (userName . _playerUser . _rpsGamePlayer2) g <> "\n"
+  <> (userName . _participantUser . _rpsGamePlayer2) g <> "\n"
 
 renderRPSGameFinished :: RPSGame -> Text
 renderRPSGameFinished g = pack
-  $  "(" <> (userName . _playerUser . _rpsGamePlayer1) g <> ") "
+  $  "(" <> (userName . _participantUser . _rpsGamePlayer1) g <> ") "
   <> maybe "[ X ]" show (fst $ _rpsGamePlay g)
   <> " vs "
   <> maybe "[ X ]" show (snd $ _rpsGamePlay g)
-  <> " (" <> (userName . _playerUser . _rpsGamePlayer2) g <> ")\n"
+  <> " (" <> (userName . _participantUser . _rpsGamePlayer2) g <> ")\n"
   <> maybe "MATCH UNRESOLVED" renderResult (matchPlay (_rpsGamePlay g)) <> "\n"
   where
     renderResult = \case
-      Win  -> (userName . _playerUser . _rpsGamePlayer1) g <> " WINS!"
-      Lose -> (userName . _playerUser . _rpsGamePlayer2) g <> " WINS!"
+      Win  -> (userName . _participantUser . _rpsGamePlayer1) g <> " WINS!"
+      Lose -> (userName . _participantUser . _rpsGamePlayer2) g <> " WINS!"
       Tie  -> "GAME WAS A TIE"

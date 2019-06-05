@@ -48,7 +48,7 @@ import Magus.Types
 import qualified Discord as D
 import qualified Prelude as P
 
-data Jugada = Jugada Player Card
+data Jugada = Jugada Participant Card
 
 jugar :: Ronda -> Jugada -> Ronda
 jugar (Ronda js) j = Ronda (j:js)
@@ -92,9 +92,9 @@ trucoApp dis = do
       { _trucoGameId        = i
       , _trucoGameChannelId = _trucoCommandChannel c
       , _trucoGameMazo      = cs2
-      , _trucoGamePlayer1   = Player u1 c1
+      , _trucoGamePlayer1   = Participant u1 c1
       , _trucoGameHand1     = h1
-      , _trucoGamePlayer2   = Player u2 c2
+      , _trucoGamePlayer2   = Participant u2 c2
       , _trucoGameHand2     = h2
       , _trucoGameJuego     = consTurnPlay
       }) <$> eu1 <*> ec1 <*> eu2 <*> ec2
@@ -105,8 +105,8 @@ trucoApp dis = do
         = fanEither
         $ (fmap ((\(g, p) -> do
             g2 <- trucoPlay p g
-            if   channelId (_playerChannel (_trucoGamePlayer1 g)) /= _trucoPlayCommandChannel p
-              && channelId (_playerChannel (_trucoGamePlayer2 g)) /= _trucoPlayCommandChannel p
+            if   channelId (_participantChannel (_trucoGamePlayer1 g)) /= _trucoPlayCommandChannel p
+              && channelId (_participantChannel (_trucoGamePlayer2 g)) /= _trucoPlayCommandChannel p
             then Left $ TrucoPayedInPublicRoom (userId (_trucoPlayCommandAuthor p)) (_trucoPlayCommandChannel p)
             else Right (g2, Just p)
             )))
@@ -124,12 +124,12 @@ trucoApp dis = do
             $ renderTrucoGameStarted g
           }
     , e_ng <&> \g ->
-        CreateMessageEmbed (channelId . _playerChannel $ _trucoGamePlayer1 g) "" trucoEmbed
+        CreateMessageEmbed (channelId . _participantChannel $ _trucoGamePlayer1 g) "" trucoEmbed
           { D.embedDescription = pure . unpack
             $ renderTrucoPlayerHand (_trucoGameHand1 g)
           }
     , e_ng <&> \g ->
-        CreateMessageEmbed (channelId . _playerChannel $ _trucoGamePlayer2 g) "" trucoEmbed
+        CreateMessageEmbed (channelId . _participantChannel $ _trucoGamePlayer2 g) "" trucoEmbed
           { D.embedDescription = pure . unpack
             $ renderTrucoPlayerHand (_trucoGameHand2 g)
           }
@@ -140,13 +140,13 @@ trucoApp dis = do
     -- , mapMaybe sequence e_state <&> \(g, p) -> do
     --     let u1 = _rpsGamePlayer1 g
     --         u2 = _rpsGamePlayer2 g
-    --     if userId (rpsPlayCommandAuthor p) == userId (_playerUser u1)
+    --     if userId (rpsPlayCommandAuthor p) == userId (_participantUser u1)
     --     then CreateMessageEmbed (_rpsGameChannelId g) "" $ rpsEmbed
-    --       { D.embedDescription = pure $ userName (_playerUser u1) <> " made a move."
+    --       { D.embedDescription = pure $ userName (_participantUser u1) <> " made a move."
     --       }
     --     else CreateMessageEmbed (_rpsGameChannelId g) "" $ rpsEmbed
     --       { D.embedDescription = pure
-    --         $ userName (_playerUser u2) <> " made a move."
+    --         $ userName (_participantUser u2) <> " made a move."
     --       }
     -- -- , f_dmc <&> \e -> CreateMessage (Snowflake c) $ pack (show e)
     , f_pla <&> \case
@@ -175,11 +175,11 @@ trucoApp dis = do
       pure $ attach (current d_id) e
     trucoPlay :: TrucoPlayCommand -> TrucoGame -> Either (TrucoGameError Snowflake) TrucoGame
     trucoPlay p g
-      | uid == (userId . _playerUser $ _trucoGamePlayer1 g)
+      | uid == (userId . _participantUser $ _trucoGamePlayer1 g)
         = do
           (c, cs) <- left (TrucoPlayError uid) $ playCard (_trucoPlayCommandCard p) (_trucoGameHand1 g)
           setPlay $ playFirst c gp
-      | uid == (userId . _playerUser $ _trucoGamePlayer2 g)
+      | uid == (userId . _participantUser $ _trucoGamePlayer2 g)
         = do
           (c, cs) <- left (TrucoPlayError uid) $ playCard (_trucoPlayCommandCard p) (_trucoGameHand2 g)
           setPlay $ playSecond c gp
@@ -204,22 +204,22 @@ renderTrucoPlayerHand (indexed -> cs)
 
 renderTrucoGameStarted :: TrucoGame -> Text
 renderTrucoGameStarted g = pack
-  $  (userName . _playerUser . _trucoGamePlayer1) g
+  $  (userName . _participantUser . _trucoGamePlayer1) g
   <> " vs "
-  <> (userName . _playerUser . _trucoGamePlayer2) g <> "\n"
+  <> (userName . _participantUser . _trucoGamePlayer2) g <> "\n"
   <> "A DM was sent with your dealt Hand\n"
 
 renderTrucoGameFinished :: TrucoGame -> Text
 renderTrucoGameFinished g = pack
-  $  "(" <> (userName . _playerUser . _trucoGamePlayer1) g <> ") "
+  $  "(" <> (userName . _participantUser . _trucoGamePlayer1) g <> ") "
   <> maybe "[ X ]" show (justFirstPlay $ _trucoGameJuego g)
   <> " vs "
   <> maybe "[ X ]" show (justSecondPlay $ _trucoGameJuego g)
-  <> " (" <> (userName . _playerUser . _trucoGamePlayer2) g <> ")\n"
+  <> " (" <> (userName . _participantUser . _trucoGamePlayer2) g <> ")\n"
   -- <> fromMaybe "MATCH UNRESOLVED" (renderResult <$> matchPlay (_trucoGamePlay g)) <> "\n"
   -- where
   --   renderResult = \case
-  --     Win  -> (userName . _playerUser $ _trucoGamePlayer1 g) <> " WINS!"
-  --     Lose -> (userName . _playerUser $ _trucoGamePlayer2 g) <> " WINS!"
+  --     Win  -> (userName . _participantUser $ _trucoGamePlayer1 g) <> " WINS!"
+  --     Lose -> (userName . _participantUser $ _trucoGamePlayer2 g) <> " WINS!"
   --     Tie  -> "GAME WAS A TIE"
         

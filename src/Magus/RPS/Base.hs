@@ -17,8 +17,8 @@ import Magus.Types
 data RPSGame = RPSGame
   { _rpsGameId        :: Natural
   , _rpsGameChannelId :: Snowflake
-  , _rpsGamePlayer1   :: Player
-  , _rpsGamePlayer2   :: Player
+  , _rpsGamePlayer1   :: Participant
+  , _rpsGamePlayer2   :: Participant
   , _rpsGamePlay      :: SimultaneousPlay RPS RPS
   } deriving (Eq, Show)
 

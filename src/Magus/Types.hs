@@ -11,13 +11,12 @@ import Text.Show (Show)
 import Arcana.Game
 import Arcana.RPS
 
--- Participant
-data Player = Player
-  { _playerUser    :: User
-  , _playerChannel :: Channel
+data Participant = Participant
+  { _participantUser    :: User
+  , _participantChannel :: Channel
   } deriving (Eq, Show)
 
-playerId :: Player -> Snowflake
-playerId = userId . _playerUser
+participantId :: Participant -> Snowflake
+participantId = userId . _participantUser
 
-makeLenses ''Player
+makeLenses ''Participant

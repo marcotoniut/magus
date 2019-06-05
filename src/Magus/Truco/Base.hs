@@ -27,9 +27,9 @@ data TrucoGame = TrucoGame
   { _trucoGameId        :: Natural
   , _trucoGameChannelId :: Snowflake
   , _trucoGameMazo      :: [Card]
-  , _trucoGamePlayer1   :: Player
+  , _trucoGamePlayer1   :: Participant
   , _trucoGameHand1     :: [Card]
-  , _trucoGamePlayer2   :: Player
+  , _trucoGamePlayer2   :: Participant
   , _trucoGameHand2     :: [Card]
   , _trucoGameJuego     :: TurnPlay Card Card
   } deriving (Eq, Show)

@@ -32,10 +32,30 @@ import qualified Prelude as P
 newtype PartyT t m a = PartyT
   { unPartyT
   :: Behavior t Int
-  -> Event t (IntMap [(Snowflake, Either RestCallException Player)])
+  -> Event t (IntMap [(Snowflake, Either RestCallException Participant)])
   -> EventWriterT t (IntMap [Snowflake]) m a
   }
 
+runPartyT :: forall t m w a.
+  ( Monad m
+  , MonadFix m
+  , MonadHold t m
+  , MonadIO (Performable m)
+  , PerformEvent t m
+  ) => (RestChan, Gateway, [ThreadIdType])
+    -> PartyT t m a
+    -> m a
+runPartyT dis w = mdo
+  d_id <- count e_req
+  (a, e_req) <- runEventWriterT $ unPartyT w (current d_id) e_res
+  e_res :: Event t (IntMap [(Snowflake, Either RestCallException Participant)]) <- performEvent $ e_req <&> \xs -> do -- \(i, k) -> do
+    forM xs $ \ks -> do
+      forM ks $ \k -> do
+        res <- liftIO $ fetchParticipant dis k
+        pure $ (k, res)
+  pure a
+
+-- TODO
 runWithCachePartyT :: forall t m w a.
   ( Monad m
   , MonadFix m
@@ -45,15 +65,7 @@ runWithCachePartyT :: forall t m w a.
   ) => (RestChan, Gateway, [ThreadIdType])
     -> PartyT t m a
     -> m a
-runWithCachePartyT dis w = mdo
-  d_id <- count e_req
-  (a, e_req) <- runEventWriterT $ unPartyT w (current d_id) e_res
-  e_res :: Event t (IntMap [(Snowflake, Either RestCallException Player)]) <- performEvent $ e_req <&> \xs -> do -- \(i, k) -> do
-    forM xs $ \ks -> do
-      forM ks $ \k -> do
-        res <- liftIO $ fetchParticipant dis k
-        pure $ (k, res)
-  pure a
+runWithCachePartyT = runPartyT
 
 -- mapPartyT :: (m a -> n b) -> PartyT t m a -> PartyT t n b
 mapPartyT :: (EventWriterT t (IntMap [Snowflake]) m a -> EventWriterT t (IntMap [Snowflake]) n b) -> PartyT t m a -> PartyT t n b
@@ -134,9 +146,9 @@ instance PostBuild t m => PostBuild t (PartyT t m) where
   getPostBuild = lift getPostBuild
 
 class (Monad m, Reflex t) => DiscordParty t m where
-  invite :: Event t [Snowflake] -> m (Event t (Map Snowflake (Either RestCallException Player)))
+  invite :: Event t [Snowflake] -> m (Event t (Map Snowflake (Either RestCallException Participant)))
 
-inviteOne :: DiscordParty t m => Event t Snowflake -> m (Event t (Snowflake, Either RestCallException Player))
+inviteOne :: DiscordParty t m => Event t Snowflake -> m (Event t (Snowflake, Either RestCallException Participant))
 inviteOne e_i = fmap (head . M.toList) <$> invite (e_i <&> \s -> [s])
 
 type FetchConstraints t m =
@@ -155,16 +167,16 @@ instance (FetchConstraints t m, MonadFix m) => DiscordParty t (PartyT t m) where
       tellEvent (uncurry singleton <$> e_ik)
 
       b_k <- hold (-1) (fst <$> e_ik)
-      let e_r :: Event t (Int, IntMap [(Snowflake, Either RestCallException Player)]) = attachWith (,) b_k e_res
-      -- let e_r :: Event t (Int, IntMap [(Snowflake, Either RestCallException Player)]) = attachWith (,) b_k e_res
+      let e_r :: Event t (Int, IntMap [(Snowflake, Either RestCallException Participant)]) = attachWith (,) b_k e_res
+      -- let e_r :: Event t (Int, IntMap [(Snowflake, Either RestCallException Participant)]) = attachWith (,) b_k e_res
       -- pure $ Reflex.mapMaybe (\(i, (k, s, p)) -> if i == k then Just (s, p) else Nothing) e_r
       pure $ mapMaybe (\(i, xs) -> M.fromList <$> lookup i xs) e_r
 
 fetchParticipant ::
        (RestChan, Gateway, [ThreadIdType])
     -> Snowflake
-    -> IO (Either RestCallException Player)
+    -> IO (Either RestCallException Participant)
 fetchParticipant dis i = do
   eu <- restCall dis (GetUser i)
   ec <- restCall dis (CreateDM i)
-  pure $ Player <$> eu <*> ec
+  pure $ Participant <$> eu <*> ec
