@@ -62,8 +62,22 @@ rpsApp dis = do
   e_igc <- registerNewGame e_ngc
 
   -- TEST Party
-  e_participantTest1 <- invite (P.replicate 1 . rpsCommandPlayer1 . snd <$> e_igc)
-  performEvent $ e_participantTest1 <&> \p -> liftIO $ P.putStrLn $ show p
+  -- e_participantTest1 <- invite (P.replicate 1 . rpsCommandPlayer1 . snd <$> e_igc)
+  -- performEvent $ e_participantTest1 <&> \p -> liftIO $ P.putStrLn $ show p
+
+  -- e_pb <- getPostBuild
+  -- e_cn <- performEventAsync $ ffor e_pb $ \_ cb -> liftIO $ do
+  --   let f x = do
+  --         P.putStrLn $ show x
+  --         cb x
+  --   let ls = [1..10]
+  --   -- let ls = f <$> [1..5]
+  --   -- fmap f ls `using` parList rpar
+
+  --   mapConcurrently f ls
+  --   pure ()
+
+  -- performEvent $ (traceEvent "EVENT" e_cn) <&> \p -> liftIO $ P.putStrLn $ show p
 
   (f_ng, e_ng) <- fmap fanEither $ performEvent $ e_igc <&> \(i, c) -> liftIO $ do
     let id1 = rpsCommandPlayer1 c

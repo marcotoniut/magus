@@ -34,6 +34,7 @@ executable magus
   -- other-extensions:    
   build-depends:       base
                      , aeson
+                     , async
                      , cond
                      , containers
                      , data-default

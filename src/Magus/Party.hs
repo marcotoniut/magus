@@ -2,20 +2,22 @@
     RankNTypes, RecursiveDo, ScopedTypeVariables, TupleSections, TypeFamilies #-}
 module Magus.Party where
 
-import Control.Applicative
+import Control.Concurrent.Async (mapConcurrently)
+import Control.Applicative (Applicative, liftA2, pure, (<*>))
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Fix
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Either
 import Data.Eq
-import Data.Function (const, id, flip, ($), (.))
+import Data.Function (const, id, flip, ($), (.), (&))
 import Data.Functor ((<$>), (<&>), ($>))
 import Data.Int
+import Data.IntMap (IntMap, delete, empty, insert, lookup, toList, singleton, update)
 import Data.List (head)
 import Data.Map (Map)
-import Data.IntMap (IntMap, singleton, lookup)
-import Data.Tuple (fst, uncurry)
+import Data.Maybe (Maybe(Just, Nothing))
+import Data.Tuple (fst, snd, uncurry)
 import Discord (
     Snowflake, Gateway, ThreadIdType, RestChan
   , RestCallException, UserRequest(CreateDM, GetUser)
@@ -29,10 +31,16 @@ import qualified Data.Map as M
 import Magus.Types
 import qualified Prelude as P
 
+fetchParticipant :: (RestChan, Gateway, [ThreadIdType]) -> Snowflake -> IO (Either RestCallException Participant)
+fetchParticipant dis i = do
+  eu <- restCall dis (GetUser i)
+  ec <- restCall dis (CreateDM i)
+  pure $ Participant <$> eu <*> ec
+
 newtype PartyT t m a = PartyT
   { unPartyT
   :: Behavior t Int
-  -> Event t (IntMap [(Snowflake, Either RestCallException Participant)])
+  -> Event t (Int, Snowflake, Either RestCallException Participant)
   -> EventWriterT t (IntMap [Snowflake]) m a
   }
 
@@ -42,17 +50,18 @@ runPartyT :: forall t m w a.
   , MonadHold t m
   , MonadIO (Performable m)
   , PerformEvent t m
+  , TriggerEvent t m
   ) => (RestChan, Gateway, [ThreadIdType])
     -> PartyT t m a
     -> m a
 runPartyT dis w = mdo
   d_id <- count e_req
   (a, e_req) <- runEventWriterT $ unPartyT w (current d_id) e_res
-  e_res :: Event t (IntMap [(Snowflake, Either RestCallException Participant)]) <- performEvent $ e_req <&> \xs -> do -- \(i, k) -> do
-    forM xs $ \ks -> do
-      forM ks $ \k -> do
-        res <- liftIO $ fetchParticipant dis k
-        pure $ (k, res)
+  e_res <- performEventAsync $ ffor e_req $ \xs cb -> liftIO $ do
+    mapConcurrently (\(i, ks) -> forM ks $ \k -> do
+      p <- fetchParticipant dis k
+      cb (i, k, p)) (toList xs)
+    pure ()
   pure a
 
 -- TODO
@@ -62,6 +71,7 @@ runWithCachePartyT :: forall t m w a.
   , MonadHold t m
   , MonadIO (Performable m)
   , PerformEvent t m
+  , TriggerEvent t m
   ) => (RestChan, Gateway, [ThreadIdType])
     -> PartyT t m a
     -> m a
@@ -153,30 +163,59 @@ inviteOne e_i = fmap (head . M.toList) <$> invite (e_i <&> \s -> [s])
 
 type FetchConstraints t m =
   ( MonadHold t m
-  , MonadIO m
   , MonadIO (Performable m)
+  , MonadFix m
   , PerformEvent t m
   )
 
-instance (FetchConstraints t m, MonadFix m) => DiscordParty t (PartyT t m) where
-  invite e_k = do
-    PartyT $ \b_id e_res -> do
-      let e_ik = attach b_id e_k
 
-      -- TODO Tell Map
-      tellEvent (uncurry singleton <$> e_ik)
+data FetchingParty = FetchingParty
+  { _fetchingPartyId :: Int
+  , _fetchingPartyLength :: Int
+  , _fetchingPartyMap :: Map Snowflake (Either RestCallException Participant)
+  }
 
-      b_k <- hold (-1) (fst <$> e_ik)
-      let e_r :: Event t (Int, IntMap [(Snowflake, Either RestCallException Participant)]) = attachWith (,) b_k e_res
-      -- let e_r :: Event t (Int, IntMap [(Snowflake, Either RestCallException Participant)]) = attachWith (,) b_k e_res
-      -- pure $ Reflex.mapMaybe (\(i, (k, s, p)) -> if i == k then Just (s, p) else Nothing) e_r
-      pure $ mapMaybe (\(i, xs) -> M.fromList <$> lookup i xs) e_r
+instance FetchConstraints t m => DiscordParty t (PartyT t m) where
+  invite e_k = PartyT $ \b_id e_res -> do
+    let e_ik = attach b_id e_k
 
-fetchParticipant ::
-       (RestChan, Gateway, [ThreadIdType])
-    -> Snowflake
-    -> IO (Either RestCallException Participant)
-fetchParticipant dis i = do
-  eu <- restCall dis (GetUser i)
-  ec <- restCall dis (CreateDM i)
-  pure $ Participant <$> eu <*> ec
+    -- TODO Tell Map
+    tellEvent (uncurry singleton <$> e_ik)
+
+    b_k <- hold (-1) (fst <$> e_ik)
+    let e_r = fmap snd . ffilter (\(i, (k, _, _)) -> i == k) $ attachWith (,) b_k e_res
+
+    -- let e_ul = attachWith updateLookup b_k e_r
+
+    -- TODO Accumulator instance
+    d_km <- accumDyn (&) (Nothing, empty) $ leftmost
+      [ e_ik <&> \(i, s) -> insertFetching (i, s)
+      , e_r  <&> updateFetching
+      ]
+    -- pure $ Reflex.mapMaybe (\(i, (k, s, p)) -> if i == k then Just (s, p) else Nothing) e_r
+    pure $ fmap _fetchingPartyMap . mapMaybe fst $ updated d_km
+    where
+    insertFetching ::
+         (Int, [Snowflake])
+      -> (Maybe FetchingParty, IntMap FetchingParty)
+      -> (Maybe FetchingParty, IntMap FetchingParty)
+    insertFetching (i, xs) (_, m) = (Nothing, insert i (FetchingParty i (P.length xs) M.empty) m)
+    updateFetching ::
+         (Int, Snowflake, Either RestCallException Participant)
+      -> (Maybe FetchingParty, IntMap FetchingParty)
+      -> (Maybe FetchingParty, IntMap FetchingParty)
+    updateFetching (i, s, e) (_, m) =
+      let mfp = lookup i m
+      in  case mfp of
+        Nothing -> (Nothing, m)
+        Just fp -> do
+          let fpm = _fetchingPartyMap fp
+              mp  = M.lookup s fpm
+          let nfp = fp
+                { _fetchingPartyMap = case mp of
+                  Nothing -> M.insert s e fpm
+                  Just p  -> fpm
+                }       
+          if _fetchingPartyLength nfp == P.length (_fetchingPartyMap nfp)
+          then (Just nfp, delete i m)
+          else (Nothing, update (const (Just nfp)) i m)
