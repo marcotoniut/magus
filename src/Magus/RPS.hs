@@ -53,9 +53,9 @@ rpsApp :: forall t m.
   , PerformEvent t m
   , TriggerEvent t m
   ) => (RestChan, Gateway, [ThreadIdType])
+    -> Event t D.Event
     -> m ()
-rpsApp dis = do
-  e_m <- subscribeToDiscord dis
+rpsApp dis e_m = do
   let (f_rps, e_ngc) = fanEither $ catchCommand (Proxy @"!rps") e_m
       (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"!rpsplay") e_m
   
@@ -78,6 +78,7 @@ rpsApp dis = do
   --   pure ()
 
   -- performEvent $ (traceEvent "EVENT" e_cn) <&> \p -> liftIO $ P.putStrLn $ show p
+  -- e_inv <- invite e_igc
 
   (f_ng, e_ng) <- fmap fanEither $ performEvent $ e_igc <&> \(i, c) -> liftIO $ do
     let id1 = rpsCommandPlayer1 c

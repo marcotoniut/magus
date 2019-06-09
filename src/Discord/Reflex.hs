@@ -25,6 +25,7 @@ subscribeToDiscord ::
   ) => (RestChan, Gateway, [ThreadIdType])
     -> m (Event t D.Event)
 subscribeToDiscord dis = do
+  -- TODO Fix threading problem with multiple subscriptions
   (e, eTrigger) <- first (mapMaybe id) <$> newTriggerEvent
   void . liftIO . forkIO . forever $ do
     de <- D.nextEvent dis

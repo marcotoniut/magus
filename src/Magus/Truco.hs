@@ -68,9 +68,9 @@ trucoApp :: forall t m.
   , PerformEvent t m
   , TriggerEvent t m
   ) => (RestChan, Gateway, [ThreadIdType])
+    -> Event t D.Event
     -> m ()
-trucoApp dis = do
-  e_m <- subscribeToDiscord dis
+trucoApp dis e_m = do
   let (f_ngc, e_ngc) = fanEither $ catchCommand (Proxy @"!truco") e_m
       (f_plc, e_plc) = fanEither $ catchCommand (Proxy @"!tplay") e_m
 

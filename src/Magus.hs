@@ -84,8 +84,8 @@ magusApp dis rg = do
   e_dr <- fmap (first succ) <$> attachRandom rg (e_dc <&> \c -> (randomR (minBound, pred $ _diceCommandSize c), c))
 
   runWithCachePartyT dis $ do
-    rpsApp dis
-    trucoApp dis
+    rpsApp dis e_m
+    trucoApp dis e_m
 
   mapM_ (emitToDiscord dis)
     [ e_dr <&> \(r, DiceCommand m s) ->
